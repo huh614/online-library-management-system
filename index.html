@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" class="auto-theme">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    <!-- Phospor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-box glass">
+            <div class="login-logo"><i class="ph-fill ph-books"></i></div>
+            <h2>Library Login</h2>
+            
+            <div class="role-tabs">
+                <div class="role-tab active" data-role="admin">Librarian</div>
+                <div class="role-tab" data-role="member">Member</div>
+            </div>
+
+            <form id="login-form">
+                <div class="input-group" style="text-align: left;">
+                    <label>Email Address</label>
+                    <input type="email" id="login-email" class="input-field" required placeholder="name@example.com">
+                </div>
+                <div class="input-group" style="text-align: left;">
+                    <label>Password</label>
+                    <input type="password" id="login-password" class="input-field" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Sign In</button>
+            </form>
+            
+            <div class="demo-hint" id="fill-demo-btn">Fill demo credentials</div>
+            <div id="login-error" style="color: var(--danger-color); font-size: 13px; margin-top: 10px; display: none;">Invalid credentials</div>
+        </div>
+    </div>
+
+    <!-- Main App Container (Hidden initially) -->
+    <div id="app-container" class="hidden">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="glass" style="border-radius: 0;">
+            <div class="logo-area">
+                <i class="ph-fill ph-books"></i>
+                <span>Library OS</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <!-- Admin Links -->
+                <div class="nav-item admin-only active" data-view="dashboard">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </div>
+                <div class="nav-item admin-only" data-view="books">
+                    <i class="ph ph-book-open"></i> Books Catalog
+                </div>
+                <div class="nav-item admin-only" data-view="members">
+                    <i class="ph ph-users"></i> Members
+                </div>
+                <div class="nav-item admin-only" data-view="circulation">
+                    <i class="ph ph-arrows-left-right"></i> Circulation
+                </div>
+                
+                <!-- Member Links -->
+                <div class="nav-item member-only" data-view="member-dashboard">
+                    <i class="ph ph-user"></i> My Profile
+                </div>
+                <div class="nav-item member-only" data-view="member-books">
+                    <i class="ph ph-bookmark"></i> Browse Books
+                </div>
+            </nav>
+
+            <div class="user-area">
+                <div class="user-info">
+                    <span class="user-name" id="current-user-name">User Name</span>
+                    <span class="user-role" id="current-user-role">Role</span>
+                </div>
+                <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%;" id="logout-btn" title="Logout">
+                    <i class="ph ph-sign-out"></i>
+                </button>
+            </div>
+            <div style="margin-top: 10px; align-self: flex-start;">
+                 <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%;" id="theme-toggle" title="Toggle Theme">
+                    <i class="ph ph-moon"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Dynamic Vies Content will be injected here via JS -->
+            <div id="view-container"></div>
+        </main>
+    </div>
+
+    <!-- Global Modals Container -->
+    <div id="modal-container"></div>
+
+    <!-- Scripts -->
+    <script src="db.js"></script>
+    <script src="auth.js"></script>
+    <script src="views/dashboard.js"></script>
+    <script src="views/books.js"></script>
+    <script src="views/members.js"></script>
+    <script src="views/circulation.js"></script>
+    <script src="views/member_portal.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>
