@@ -14,6 +14,9 @@ class MemberDashboardView {
         const allBorrows = await DB.getAll('borrows');
         this.history = allBorrows.filter(b => b.memberId === this.user.memberId && b.status === 'Returned');
         this.books = await DB.getAll('books');
+        
+        const wishlistIds = await DB.getWishlist(this.user.memberId);
+        this.wishlist = this.books.filter(b => wishlistIds.includes(b.bookId));
         this.render();
     }
 
@@ -59,11 +62,24 @@ class MemberDashboardView {
             <div class="view-section">
                 <h1>My Profile</h1>
                 <div class="flex gap-4" style="margin-top: 20px;">
-                    <!-- Left: Current Books -->
+                    <!-- Left: Current Books & Wishlist -->
                     <div style="flex: 1;">
                         <h2 style="margin-bottom: 15px;">Currently Reading</h2>
                         <div class="flex-col gap-3">
                             ${activeHTML}
+                        </div>
+                        
+                        <h2 style="margin-top: 30px; margin-bottom: 15px;">My Wishlist</h2>
+                        <div class="flex-col gap-3">
+                            ${this.wishlist.length ? this.wishlist.map(b => `
+                                <div class="glass" style="padding: 10px; display: flex; align-items: center; justify-content: space-between; border-radius: 8px;">
+                                     <div style="display: flex; align-items: center; gap: 10px;">
+                                         <div style="width: 30px; height: 45px; background: ${b.coverColor}; border-radius: 2px;"></div>
+                                         <div style="font-weight: 500">${b.title}</div>
+                                     </div>
+                                     <button class="btn btn-secondary" style="padding: 4px;" onclick="window.memberDashboardView.removeFromWishlist('${b.bookId}')"><i class="ph ph-trash"></i></button>
+                                </div>
+                            `).join('') : '<p style="color:var(--text-muted)">Your wishlist is empty.</p>'}
                         </div>
                     </div>
                     
@@ -150,11 +166,13 @@ class MemberDashboardView {
             const today = new Date().toISOString().split('T')[0];
             await DB.processReturn(borrowId, borrow.bookId, today);
 
-            this.borrows = await DB.getActiveBorrowsForMember(this.user.memberId);
-            const allBorrows = await DB.getAll('borrows');
-            this.history = allBorrows.filter(b => b.memberId === this.user.memberId && b.status === 'Returned');
-            this.render();
+            this.init(); // Refresh data
         }, 'Return Book');
+    }
+
+    async removeFromWishlist(bookId) {
+        await DB.toggleWishlist(this.user.memberId, bookId, false);
+        this.init();
     }
 
     destroy() {
@@ -167,10 +185,12 @@ class MemberBooksView {
     constructor(container) {
         this.container = container;
         this.books = [];
+        this.wishlistIds = [];
     }
 
     async init() {
         this.books = await DB.getAllBooksWithAuthors();
+        this.wishlistIds = await DB.getWishlist(Auth.getUser().memberId);
         this.render();
     }
 
@@ -181,11 +201,17 @@ class MemberBooksView {
                 ? `<span class="badge badge-success" style="position: absolute; top: 10px; right: 10px;">Available</span>`
                 : `<span class="badge badge-danger" style="position: absolute; top: 10px; right: 10px;">Out of Stock</span>`;
 
+            const inWishlist = this.wishlistIds.includes(b.bookId);
+            const heartIcon = inWishlist ? '<i class="ph-fill ph-heart" style="color:var(--danger-color)"></i>' : '<i class="ph ph-heart"></i>';
+
             const borrowBtn = b.availableCopies > 0 ? `<button class="btn btn-primary" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="window.memberBooksView.borrowBook('${b.bookId}')">Borrow Now</button>` : '';
 
             return `
                 <div class="glass book-card" style="padding: 16px; display: flex; flex-direction: column; border-radius: 12px; transition: transform 0.2s; cursor: pointer; position: relative;">
                     ${badge}
+                    <button style="position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);" onclick="window.memberBooksView.toggleWishlist('${b.bookId}', ${!inWishlist})">
+                        ${heartIcon}
+                    </button>
                     <div style="height: 180px; background: ${b.coverColor}; border-radius: 8px; margin-bottom: 15px;"></div>
                     <div style="flex: 1;">
                         <h3 style="font-size: 16px; margin-bottom: 4px; line-height: 1.3;">${b.title}</h3>
@@ -195,7 +221,10 @@ class MemberBooksView {
                             <span style="color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${b.availableCopies} left</span>
                         </div>
                     </div>
-                    ${borrowBtn}
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <div style="flex: 1;">${borrowBtn ? borrowBtn.replace('margin-top: 10px;', '') : ''}</div>
+                        <button class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="window.memberBooksView.readExcerpt('${b.bookId}')">E-Book</button>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -261,6 +290,23 @@ class MemberBooksView {
 
             return true;
         }, 'Borrow Book');
+    }
+
+    async toggleWishlist(bookId, isAdding) {
+        await DB.toggleWishlist(Auth.getUser().memberId, bookId, isAdding);
+        this.init();
+    }
+
+    readExcerpt(bookId) {
+        const book = this.books.find(b => b.bookId === bookId);
+        const html = `
+            <div style="background: var(--surface-light); padding: 15px; border-radius: 8px; font-family: serif; line-height: 1.6;">
+                <p><em>(Digital Content Placeholder)</em></p>
+                <p>The sky above the port was the color of television, tuned to a dead channel. It was the best of times, it was the blurst of times...</p>
+                <p>This is a simulated digital reading view. In a full system, the complete EPUB or PDF reader would launch here for <strong>${book.title}</strong>.</p>
+            </div>
+        `;
+        App.showModal(`Reading Excerpt: ${book.title}`, html, null, 'Close');
     }
 
     filter(term) {

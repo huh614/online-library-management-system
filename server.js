@@ -148,6 +148,27 @@ app.post('/api/sync-overdue', (req, res) => {
     });
 });
 
+// Wishlists
+app.get('/api/wishlists/:memberId', (req, res) => {
+    db.all(`SELECT bookId FROM wishlists WHERE memberId = ?`, [req.params.memberId], (err, rows) => {
+        res.json(rows ? rows.map(r => r.bookId) : []);
+    });
+});
+
+app.post('/api/wishlists', (req, res) => {
+    const { memberId, bookId } = req.body;
+    db.run(`INSERT INTO wishlists (memberId, bookId) VALUES (?, ?)`, [memberId, bookId], function(err) {
+        res.json({ success: !err }); // Ignore UNIQUE constraint errors gracefully
+    });
+});
+
+app.delete('/api/wishlists', (req, res) => {
+    const { memberId, bookId } = req.body;
+    db.run(`DELETE FROM wishlists WHERE memberId = ? AND bookId = ?`, [memberId, bookId], function(err) {
+        res.json({ success: !err });
+    });
+});
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

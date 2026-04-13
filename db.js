@@ -11,13 +11,19 @@ const DB = {
     return {
       members: [
         { memberId: 'MEM001', name: 'Rahul Verma', age: 22, membershipType: 'Student', phone: '9123456789', email: 'member@library.com', password: 'member123', joinDate: '2024-06-01', status: 'Active' },
-        { memberId: 'MEM002', name: 'Anjali Patel', age: 28, membershipType: 'Premium', phone: '9234567890', email: 'anjali@example.com', password: 'anjali123', joinDate: '2024-03-15', status: 'Active' }
+        { memberId: 'MEM002', name: 'Anjali Patel', age: 28, membershipType: 'Premium', phone: '9234567890', email: 'anjali@example.com', password: 'anjali123', joinDate: '2024-03-15', status: 'Active' },
+        { memberId: 'MEM003', name: 'Rohan Kapoor', age: 20, membershipType: 'Student', phone: '9345678901', email: 'rohan@example.com', password: 'rohan123', joinDate: '2024-06-10', status: 'Active' }
       ],
       books: [
         { bookId: 'BK001', title: '5 Point Someone', price: 199, publisher: 'Rupa Publications', genre: 'Fiction', totalCopies: 5, availableCopies: 3, coverColor: '#FF6B6B', addedDate: '2023-05-10', authors: [{authorId: 'AUT001', authorName: 'Chetan Bhagat'}] },
-        { bookId: 'BK002', title: 'Digital Fortress', price: 450, publisher: 'St. Martin', genre: 'Thriller', totalCopies: 3, availableCopies: 3, coverColor: '#4ECDC4', addedDate: '2023-08-20', authors: [] }
+        { bookId: 'BK002', title: 'Atomic Habits', price: 399, publisher: 'Penguin', genre: 'Self-Help', totalCopies: 12, availableCopies: 12, coverColor: '#FFB347', addedDate: '2023-08-12', authors: [{authorId: 'AUT002', authorName: 'James Clear'}] },
+        { bookId: 'BK003', title: '1984', price: 299, publisher: 'Secker & Warburg', genre: 'Dystopian', totalCopies: 8, availableCopies: 8, coverColor: '#ff4d4d', addedDate: '2023-09-01', authors: [{authorId: 'AUT003', authorName: 'George Orwell'}] },
+        { bookId: 'BK004', title: 'The Alchemist', price: 350, publisher: 'HarperTorch', genre: 'Fiction', totalCopies: 10, availableCopies: 10, coverColor: '#f9ca24', addedDate: '2023-11-15', authors: [{authorId: 'AUT004', authorName: 'Paulo Coelho'}] },
+        { bookId: 'BK005', title: 'Sapiens', price: 450, publisher: 'Harper', genre: 'History', totalCopies: 6, availableCopies: 6, coverColor: '#48dbfb', addedDate: '2024-01-05', authors: [{authorId: 'AUT005', authorName: 'Yuval Noah Harari'}] },
+        { bookId: 'BK006', title: 'Harry Potter', price: 500, publisher: 'Bloomsbury', genre: 'Fantasy', totalCopies: 15, availableCopies: 15, coverColor: '#c56cf0', addedDate: '2024-02-14', authors: [{authorId: 'AUT006', authorName: 'J.K. Rowling'}] }
       ],
-      borrows: []
+      borrows: [],
+      wishlists: []
     };
   },
 
@@ -191,5 +197,40 @@ const DB = {
       totalFines,
       recentBorrows: borrows.slice(-5).reverse()
     };
+  },
+
+  // ── Wishlist Methods ─────────────────────────
+  async getWishlist(memberId) {
+    if (useBackend) {
+       try {
+         const res = await fetch(`${BASE_URL}/wishlists/${memberId}`);
+         if(res.ok) { return await res.json(); }
+       } catch (e) { useBackend = false; }
+    }
+    const all = JSON.parse(localStorage.getItem('wishlists') || '[]');
+    return all.filter(w => w.memberId === memberId).map(w => w.bookId);
+  },
+
+  async toggleWishlist(memberId, bookId, isAdding) {
+    if (useBackend) {
+       try {
+         const method = isAdding ? 'POST' : 'DELETE';
+         await fetch(`${BASE_URL}/wishlists`, {
+           method: method,
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ memberId, bookId })
+         });
+         return;
+       } catch (e) { useBackend = false; }
+    }
+    let all = JSON.parse(localStorage.getItem('wishlists') || '[]');
+    if (isAdding) {
+        if (!all.find(w => w.memberId === memberId && w.bookId === bookId)) {
+            all.push({ memberId, bookId });
+        }
+    } else {
+        all = all.filter(w => !(w.memberId === memberId && w.bookId === bookId));
+    }
+    localStorage.setItem('wishlists', JSON.stringify(all));
   }
 };
