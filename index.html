@@ -14,7 +14,7 @@
     <div id="login-screen">
         <div class="login-box glass">
             <div class="login-logo"><i class="ph-fill ph-books"></i></div>
-            <h2>Library Login</h2>
+            <h2 id="form-title">Library Login</h2>
             
             <div class="role-tabs">
                 <div class="role-tab active" data-role="admin">Librarian</div>
@@ -22,6 +22,12 @@
             </div>
 
             <form id="login-form">
+                <div id="signup-fields" style="display: none;">
+                    <div class="input-group" style="text-align: left;">
+                        <label>Full Name</label>
+                        <input type="text" id="signup-name" class="input-field" placeholder="John Doe">
+                    </div>
+                </div>
                 <div class="input-group" style="text-align: left;">
                     <label>Email Address</label>
                     <input type="email" id="login-email" class="input-field" required placeholder="name@example.com">
@@ -30,11 +36,16 @@
                     <label>Password</label>
                     <input type="password" id="login-password" class="input-field" required placeholder="••••••••">
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Sign In</button>
+                <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Sign In</button>
             </form>
             
+            <div style="margin-top: 15px; font-size: 13px; color: var(--text-muted); text-align: center;">
+                <a href="#" id="toggle-signup" style="color: var(--primary-color); text-decoration: none;">New Member? Sign Up Here</a>
+            </div>
+
             <div class="demo-hint" id="fill-demo-btn">Fill demo credentials</div>
             <div id="login-error" style="color: var(--danger-color); font-size: 13px; margin-top: 10px; display: none;">Invalid credentials</div>
+            <div id="signup-success" style="color: var(--success-color); font-size: 13px; margin-top: 10px; display: none;">Registration successful! Redirecting...</div>
         </div>
     </div>
 

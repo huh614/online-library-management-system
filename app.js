@@ -53,17 +53,86 @@ const App = {
             }
         });
 
+        // Login/Signup Toggle
+        let isSignup = false;
+        const toggleSignupBtn = document.getElementById('toggle-signup');
+        if (toggleSignupBtn) {
+            toggleSignupBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                isSignup = !isSignup;
+                const signupFields = document.getElementById('signup-fields');
+                const formTitle = document.getElementById('form-title');
+                const submitBtn = document.getElementById('submit-btn');
+                const roleTabs = document.querySelector('.role-tabs');
+                
+                if (isSignup) {
+                    signupFields.style.display = 'block';
+                    formTitle.textContent = 'Member Registration';
+                    submitBtn.textContent = 'Sign Up';
+                    toggleSignupBtn.textContent = 'Already a Member? Sign In Here';
+                    roleTabs.style.display = 'none'; // Only members can sign up
+                    document.getElementById('signup-name').required = true;
+                    // Auto-select member role
+                    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelector('.role-tab[data-role="member"]').classList.add('active');
+                } else {
+                    signupFields.style.display = 'none';
+                    formTitle.textContent = 'Library Login';
+                    submitBtn.textContent = 'Sign In';
+                    toggleSignupBtn.textContent = 'New Member? Sign Up Here';
+                    roleTabs.style.display = 'flex';
+                    document.getElementById('signup-name').required = false;
+                }
+            });
+        }
+
         // Login Form
         document.getElementById('login-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-password').value;
-            const role = document.querySelector('.role-tab.active').dataset.role;
+            let role = document.querySelector('.role-tab.active')?.dataset.role || 'member';
 
-            if (Auth.login(email, pass, role)) {
-                this.showApp();
+            document.getElementById('login-error').style.display = 'none';
+            document.getElementById('signup-success').style.display = 'none';
+
+            if (isSignup) {
+                // Register new member
+                const name = document.getElementById('signup-name').value;
+                const members = DB.getAll('members');
+                if (members.find(m => m.email === email)) {
+                    document.getElementById('login-error').textContent = 'Email already exists!';
+                    document.getElementById('login-error').style.display = 'block';
+                    return;
+                }
+
+                const newMember = {
+                    memberId: DB.nextId('members', 'memberId', 'MEM'),
+                    name: name,
+                    email: email,
+                    password: pass,
+                    membershipType: 'Student', // Default
+                    phone: '',
+                    age: null,
+                    joinDate: new Date().toISOString().split('T')[0],
+                    status: 'Active'
+                };
+                DB.insert('members', newMember);
+                
+                document.getElementById('signup-success').style.display = 'block';
+                // Switch back to login
+                setTimeout(() => {
+                    toggleSignupBtn.click();
+                    document.getElementById('login-password').value = pass;
+                    document.getElementById('signup-success').style.display = 'block';
+                }, 1500);
             } else {
-                document.getElementById('login-error').style.display = 'block';
+                if (Auth.login(email, pass, role)) {
+                    this.showApp();
+                } else {
+                    document.getElementById('login-error').textContent = 'Invalid credentials';
+                    document.getElementById('login-error').style.display = 'block';
+                }
             }
         });
 
