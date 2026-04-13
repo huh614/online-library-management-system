@@ -91,7 +91,8 @@ const App = {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-password').value;
-            let role = document.querySelector('.role-tab.active')?.dataset.role || 'member';
+            const activeTab = document.querySelector('.role-tab.active');
+            let role = activeTab ? activeTab.dataset.role : 'member';
 
             document.getElementById('login-error').style.display = 'none';
             document.getElementById('signup-success').style.display = 'none';
