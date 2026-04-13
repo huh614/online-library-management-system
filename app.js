@@ -5,9 +5,11 @@
 const App = {
     currentView: null,
 
-    init() {
-        // Seed DB on first load
-        DB.seed();
+    async init() {
+        // Init Auth first to see if logged in
+        Auth.init();
+        
+        await DB.seed(); // Wait for server to seed if it hasn't
 
         this.cacheDOM();
         this.bindEvents();
@@ -87,7 +89,7 @@ const App = {
         }
 
         // Login Form
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-password').value;
@@ -100,7 +102,7 @@ const App = {
             if (isSignup) {
                 // Register new member
                 const name = document.getElementById('signup-name').value;
-                const members = DB.getAll('members');
+                const members = await DB.getAll('members');
                 if (members.find(m => m.email === email)) {
                     document.getElementById('login-error').textContent = 'Email already exists!';
                     document.getElementById('login-error').style.display = 'block';
@@ -108,7 +110,7 @@ const App = {
                 }
 
                 const newMember = {
-                    memberId: DB.nextId('members', 'memberId', 'MEM'),
+                    memberId: await DB.nextId('members', 'memberId', 'MEM'),
                     name: name,
                     email: email,
                     password: pass,
@@ -118,7 +120,7 @@ const App = {
                     joinDate: new Date().toISOString().split('T')[0],
                     status: 'Active'
                 };
-                DB.insert('members', newMember);
+                await DB.insert('members', newMember);
                 
                 document.getElementById('signup-success').style.display = 'block';
                 // Switch back to login
@@ -128,7 +130,8 @@ const App = {
                     document.getElementById('signup-success').style.display = 'block';
                 }, 1500);
             } else {
-                if (Auth.login(email, pass, role)) {
+                const success = await Auth.login(email, pass, role);
+                if (success) {
                     this.showApp();
                 } else {
                     document.getElementById('login-error').textContent = 'Invalid credentials';
@@ -192,7 +195,7 @@ const App = {
         }
     },
 
-    loadView(viewName) {
+    async loadView(viewName) {
         this.viewContainer.innerHTML = '';
         if (this.currentView && this.currentView.destroy) {
             this.currentView.destroy();
@@ -210,7 +213,11 @@ const App = {
 
         if (ViewClass) {
             this.currentView = new ViewClass(this.viewContainer);
-            this.currentView.render();
+            if (typeof this.currentView.init === 'function') {
+                await this.currentView.init();
+            } else {
+                this.currentView.render();
+            }
         }
     },
 

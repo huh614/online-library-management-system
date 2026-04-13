@@ -1,10 +1,21 @@
 class DashboardView {
     constructor(container) {
         this.container = container;
+        this.stats = null;
+        this.members = [];
+        this.books = [];
+    }
+
+    async init() {
+        this.stats = await DB.getStats();
+        this.members = await DB.getAll('members');
+        this.books = await DB.getAll('books');
+        this.render();
     }
 
     render() {
-        const stats = DB.getStats();
+        if (!this.stats) return;
+        const stats = this.stats;
         
         let html = `
             <div class="view-section">
@@ -86,8 +97,8 @@ class DashboardView {
         if (!borrows.length) return '<tr><td colspan="4">No recent activity</td></tr>';
         
         return borrows.map(b => {
-             const member = DB.getById('members', 'memberId', b.memberId) || { name: 'Unknown' };
-             const book = DB.getById('books', 'bookId', b.bookId) || { title: 'Unknown' };
+             const member = this.members.find(m => m.memberId === b.memberId) || { name: 'Unknown' };
+             const book = this.books.find(bk => bk.bookId === b.bookId) || { title: 'Unknown' };
              
              let statusBadge = '';
              if (b.status === 'Active') statusBadge = '<span class="badge badge-success">Active</span>';

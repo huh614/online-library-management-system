@@ -12,21 +12,25 @@ const Auth = {
         }
     },
 
-    login(email, password, role) {
-        let user = null;
-        if (role === 'admin') {
-            const admins = DB.getAll('librarians');
-            user = admins.find(u => u.email === email && u.password === password);
-        } else {
-            const members = DB.getAll('members');
-            user = members.find(u => u.email === email && u.password === password);
-        }
+    async login(email, password, role) {
+        try {
+            const res = await fetch('http://localhost:3000/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, role })
+            });
 
-        if (user) {
-            user.role = role;
-            this.currentUser = user;
-            localStorage.setItem('olms_session', JSON.stringify(user));
-            return true;
+            if (!res.ok) return false;
+
+            const user = await res.json();
+            if (user) {
+                this.currentUser = user;
+                localStorage.setItem('olms_session', JSON.stringify(user));
+                return true;
+            }
+        } catch (e) {
+            console.error("Login Error: ", e);
+            alert("Backend server connection failed. Ensure `node server.js` is running.");
         }
         return false;
     },

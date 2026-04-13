@@ -1,7 +1,11 @@
 class BooksView {
     constructor(container) {
         this.container = container;
-        this.books = DB.getAllBooksWithAuthors();
+    }
+
+    async init() {
+        this.books = await DB.getAllBooksWithAuthors();
+        this.render();
     }
 
     render() {
@@ -73,8 +77,9 @@ class BooksView {
         });
     }
 
-    showBookModal(bookId = null) {
-        let book = bookId ? DB.getById('books', 'bookId', bookId) : null;
+    async showBookModal(bookId = null) {
+        let booksList = await DB.getAll('books');
+        let book = bookId ? booksList.find(b => b.bookId === bookId) : null;
         let title = book ? 'Edit Book' : 'Add New Book';
         
         const html = `
@@ -108,7 +113,7 @@ class BooksView {
             </div>
         `;
 
-        App.showModal(title, html, () => {
+        App.showModal(title, html, async () => {
             const newBook = {
                 title: document.getElementById('b-title').value,
                 publisher: document.getElementById('b-pub').value,
@@ -119,17 +124,16 @@ class BooksView {
             };
 
             if (book) {
-                // If copies changed, update available copies correctly
                 const diff = newBook.totalCopies - book.totalCopies;
                 newBook.availableCopies = book.availableCopies + diff;
-                DB.update('books', 'bookId', bookId, newBook);
+                await DB.update('books', 'bookId', bookId, newBook);
             } else {
-                newBook.bookId = DB.nextId('books', 'bookId', 'BK');
+                newBook.bookId = await DB.nextId('books', 'bookId', 'BK');
                 newBook.availableCopies = newBook.totalCopies;
                 newBook.addedDate = new Date().toISOString().split('T')[0];
-                DB.insert('books', newBook);
+                await DB.insert('books', newBook);
             }
-            this.books = DB.getAllBooksWithAuthors();
+            this.books = await DB.getAllBooksWithAuthors();
             this.render();
         });
     }

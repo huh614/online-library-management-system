@@ -1,20 +1,19 @@
 class CirculationView {
     constructor(container) {
         this.container = container;
-        DB.syncOverdue();
-        this.borrows = DB.getAll('borrows');
+    }
+
+    async init() {
+        await DB.syncOverdue();
+        this.borrows = await DB.getAll('borrows');
+        this.render();
     }
 
     render() {
+        let memberNames = {};
+        let bookTitles = {};
+        
         let rows = this.borrows.slice().reverse().map(b => {
-             const member = DB.getById('members', 'memberId', b.memberId) || { name: 'Unknown' };
-             const book = DB.getById('books', 'bookId', b.bookId) || { title: 'Unknown' };
-             
-             let statusBadge = '';
-             if (b.status === 'Active') statusBadge = '<span class="badge badge-success">Active</span>';
-             else if (b.status === 'Overdue') statusBadge = '<span class="badge badge-danger">Overdue (₹'+b.fine+')</span>';
-             else statusBadge = '<span class="badge badge-warning">Returned</span>';
-
              const returnAction = b.status !== 'Returned' 
                 ? `<button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" onclick="window.circView.returnBook('${b.borrowId}')">Process Return</button>`
                 : `<span style="color:var(--text-muted);font-size:12px;">Returned on ${b.returnDate}</span>`;
@@ -22,11 +21,11 @@ class CirculationView {
              return `
                 <tr>
                     <td>
-                        <div style="font-weight:600">${book.title}</div>
+                        <div style="font-weight:600" class="book-title-cell" data-id="${b.bookId}">Loading...</div>
                         <div style="font-size:12px; color:var(--text-muted)">${b.bookId}</div>
                     </td>
                     <td>
-                        <div>${member.name}</div>
+                        <div class="member-name-cell" data-id="${b.memberId}">Loading...</div>
                         <div style="font-size:12px; color:var(--text-muted)">${b.memberId}</div>
                     </td>
                     <td>${b.borrowDate}</td>
@@ -69,11 +68,27 @@ class CirculationView {
 
         document.getElementById('btn-issue').addEventListener('click', () => this.showIssueModal());
         window.circView = this;
+        this.fetchDetails();
     }
 
-    showIssueModal() {
-        const books = DB.getAll('books').filter(b => b.availableCopies > 0);
-        const members = DB.getAll('members').filter(m => m.status === 'Active');
+    async fetchDetails() {
+        const books = await DB.getAll('books');
+        const members = await DB.getAll('members');
+        document.querySelectorAll('.book-title-cell').forEach(el => {
+            const b = books.find(x => x.bookId === el.dataset.id);
+            el.textContent = b ? b.title : 'Unknown';
+        });
+        document.querySelectorAll('.member-name-cell').forEach(el => {
+            const m = members.find(x => x.memberId === el.dataset.id);
+            el.textContent = m ? m.name : 'Unknown';
+        });
+    }
+
+    async showIssueModal() {
+        const _books = await DB.getAll('books');
+        const books = _books.filter(b => b.availableCopies > 0);
+        const _members = await DB.getAll('members');
+        const members = _members.filter(m => m.status === 'Active');
 
         const bookOpts = books.map(b => `<option value="${b.bookId}">${b.title} (${b.availableCopies} available)</option>`).join('');
         const memberOpts = members.map(m => `<option value="${m.memberId}">${m.name} (${m.memberId})</option>`).join('');
@@ -97,7 +112,7 @@ class CirculationView {
             </div>
         `;
 
-        App.showModal('Issue Book', html, () => {
+        App.showModal('Issue Book', html, async () => {
              const memberId = document.getElementById('i-member').value;
              const bookId = document.getElementById('i-book').value;
              const days = parseInt(document.getElementById('i-days').value) || 14;
@@ -113,24 +128,20 @@ class CirculationView {
              due.setDate(today.getDate() + days);
              const dueDate = due.toISOString().split('T')[0];
 
-             // Insert Borrow
-             DB.insert('borrows', {
-                 borrowId: DB.nextId('borrows', 'borrowId', 'BOR'),
+             await DB.insert('borrows', {
+                 borrowId: await DB.nextId('borrows', 'borrowId', 'BOR'),
                  memberId, bookId, borrowDate, dueDate, returnDate: null,
                  status: 'Active', fine: 0
              });
 
-             // Update Book Copies
-             const book = DB.getById('books', 'bookId', bookId);
-             DB.update('books', 'bookId', bookId, { availableCopies: book.availableCopies - 1 });
-
-             this.borrows = DB.getAll('borrows');
+             this.borrows = await DB.getAll('borrows');
              this.render();
         }, 'Issue Book');
     }
 
-    returnBook(borrowId) {
-        const borrow = DB.getById('borrows', 'borrowId', borrowId);
+    async returnBook(borrowId) {
+        const _all = await DB.getAll('borrows');
+        const borrow = _all.find(b => b.borrowId === borrowId);
         if (!borrow) return;
 
         let fineHTML = '';
@@ -150,27 +161,16 @@ class CirculationView {
             ${fineHTML}
         `;
 
-        App.showModal('Process Return', html, (modal) => {
+        App.showModal('Process Return', html, async (modal) => {
             if (borrow.status === 'Overdue') {
                const paid = modal.querySelector('#fine-paid').checked;
                if (!paid) { alert("Fine must be collected to process return."); return false; }
             }
 
             const today = new Date().toISOString().split('T')[0];
-            
-            // Update Borrow
-            DB.update('borrows', 'borrowId', borrowId, {
-                status: 'Returned',
-                returnDate: today
-            });
+            await DB.processReturn(borrowId, borrow.bookId, today);
 
-            // Update Book Copies
-            const book = DB.getById('books', 'bookId', borrow.bookId);
-            if (book) {
-                DB.update('books', 'bookId', borrow.bookId, { availableCopies: book.availableCopies + 1 });
-            }
-
-            this.borrows = DB.getAll('borrows');
+            this.borrows = await DB.getAll('borrows');
             this.render();
         }, 'Confirm Return');
     }
