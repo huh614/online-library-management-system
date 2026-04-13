@@ -19,6 +19,8 @@ class MemberDashboardView {
                  statusBadge = '<span class="badge badge-success">Active</span>';
              }
 
+             const returnBtn = b.status !== 'Returned' ? `<button class="btn btn-secondary" style="margin-top: 8px; font-size: 12px; padding: 4px 8px; width: 100%;" onclick="window.memberDashboardView.returnBook('${b.borrowId}')">Return Book</button>` : '';
+
              return `
                 <div class="glass" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                     <div style="display: flex; align-items: center; gap: 16px;">
@@ -28,12 +30,13 @@ class MemberDashboardView {
                             <div style="font-size: 13px; color: var(--text-muted);">Borrowed: ${b.borrowDate}</div>
                         </div>
                     </div>
-                    <div style="text-align: right;">
+                    <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
                         <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Due Date</div>
                         <div style="font-weight: 600;">${b.dueDate}</div>
                         ${fineText}
+                        ${returnBtn}
                     </div>
-                    <div>${statusBadge}</div>
+                    <div style="margin-left: 15px;">${statusBadge}</div>
                 </div>
              `;
         }).join('');
@@ -97,9 +100,57 @@ class MemberDashboardView {
                 </div>
             </div>
         `;
+        window.memberDashboardView = this;
     }
 
-    destroy() {}
+    returnBook(borrowId) {
+        const borrow = DB.getById('borrows', 'borrowId', borrowId);
+        if (!borrow) return;
+
+        let fineHTML = '';
+        if (borrow.status === 'Overdue') {
+            fineHTML = `
+                <div style="padding: 10px; background: rgba(255, 59, 48, 0.1); color: var(--danger-color); border-radius: 8px; margin-bottom: 15px;">
+                    <strong>You have an outstanding fine: ₹${borrow.fine}</strong><br>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:5px; color:var(--text);">
+                        <input type="checkbox" id="member-fine-paid" required> I agree to pay the fine online
+                    </label>
+                </div>
+            `;
+        }
+
+        const html = `
+            <p>Confirm return of this book?</p>
+            ${fineHTML}
+        `;
+
+        App.showModal('Process Return', html, (modal) => {
+            if (borrow.status === 'Overdue') {
+               const paid = modal.querySelector('#member-fine-paid').checked;
+               if (!paid) { alert("You must agree to pay the fine to process return."); return false; }
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            
+            DB.update('borrows', 'borrowId', borrowId, {
+                status: 'Returned',
+                returnDate: today
+            });
+
+            const book = DB.getById('books', 'bookId', borrow.bookId);
+            if (book) {
+                DB.update('books', 'bookId', borrow.bookId, { availableCopies: book.availableCopies + 1 });
+            }
+
+            this.borrows = DB.getActiveBorrowsForMember(this.user.memberId);
+            this.history = DB.getAll('borrows').filter(b => b.memberId === this.user.memberId && b.status === 'Returned');
+            this.render();
+        }, 'Return Book');
+    }
+
+    destroy() {
+        delete window.memberDashboardView;
+    }
 }
 
 class MemberBooksView {
@@ -112,6 +163,8 @@ class MemberBooksView {
         let grids = this.books.map(b => {
             const authorNames = b.authors.map(a => a.authorName).join(', ');
             const availStr = b.availableCopies > 0 ? `<span style="color: var(--success-color)">Available (${b.availableCopies})</span>` : `<span style="color: var(--danger-color)">Out of stock</span>`;
+            const borrowBtn = b.availableCopies > 0 ? `<button class="btn btn-primary" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="window.memberBooksView.borrowBook('${b.bookId}')">Borrow Now</button>` : '';
+
             return `
                 <div class="glass book-card" style="padding: 16px; display: flex; flex-direction: column; border-radius: 12px; transition: transform 0.2s; cursor: pointer;">
                     <div style="height: 140px; background: ${b.coverColor}; border-radius: 8px; margin-bottom: 16px; display:flex; align-items:center; justify-content:center; color:white; font-size:24px; font-weight:700; text-align:center; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.1);">${b.title.substring(0,3)}</div>
@@ -121,6 +174,7 @@ class MemberBooksView {
                     <div style="margin-top: auto; font-size: 13px; font-weight: 500;">
                         ${availStr}
                     </div>
+                    ${borrowBtn}
                 </div>
             `;
         }).join('');
@@ -149,6 +203,42 @@ class MemberBooksView {
         `;
 
         document.getElementById('search-m-books').addEventListener('input', (e) => this.filter(e.target.value));
+        window.memberBooksView = this;
+    }
+
+    borrowBook(bookId) {
+        const book = DB.getById('books', 'bookId', bookId);
+        if (!book || book.availableCopies <= 0) return;
+
+        App.showModal('Confirm Borrow', `<p>Would you like to borrow <strong>${book.title}</strong>?</p>`, () => {
+            const today = new Date();
+            const borrowDate = today.toISOString().split('T')[0];
+            const due = new Date();
+            due.setDate(today.getDate() + 14); // 14 days loan period
+            const dueDate = due.toISOString().split('T')[0];
+
+            DB.insert('borrows', {
+                borrowId: DB.nextId('borrows', 'borrowId', 'BOR'),
+                memberId: Auth.getUser().memberId, 
+                bookId, 
+                borrowDate, 
+                dueDate, 
+                returnDate: null,
+                status: 'Active', 
+                fine: 0
+            });
+
+            DB.update('books', 'bookId', bookId, { availableCopies: book.availableCopies - 1 });
+            
+            this.books = DB.getAllBooksWithAuthors();
+            this.render();
+
+            setTimeout(() => {
+                App.showModal('Success', `<p>You have successfully borrowed <strong>${book.title}</strong>.<br> Due date is <strong>${dueDate}</strong>.</p>`, () => {}, 'Okay');
+            }, 350);
+
+            return true;
+        }, 'Borrow Book');
     }
 
     filter(term) {
@@ -160,5 +250,7 @@ class MemberBooksView {
         });
     }
 
-    destroy() {}
+    destroy() {
+        delete window.memberBooksView;
+    }
 }
