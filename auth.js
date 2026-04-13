@@ -13,6 +13,7 @@ const Auth = {
     },
 
     async login(email, password, role) {
+        let user = null;
         try {
             const res = await fetch('http://localhost:3000/api/login', {
                 method: 'POST',
@@ -20,18 +21,23 @@ const Auth = {
                 body: JSON.stringify({ email, password, role })
             });
 
-            if (!res.ok) return false;
-
-            const user = await res.json();
-            if (user) {
-                this.currentUser = user;
-                localStorage.setItem('olms_session', JSON.stringify(user));
-                return true;
+            if (res.ok) {
+                user = await res.json();
             }
         } catch (e) {
-            console.error("Login Error: ", e);
-            alert("Backend server connection failed. Ensure `node server.js` is running.");
+            console.warn("Backend server not reachable. Authenticating via LocalStorage.");
+            // Offline/LocalStorage Fallback
+            const members = await DB.getAll(role === 'admin' ? 'librarians' : 'members');
+            user = members.find(u => u.email === email && u.password === password);
+            if (user) user.role = role;
         }
+
+        if (user) {
+            this.currentUser = user;
+            localStorage.setItem('olms_session', JSON.stringify(user));
+            return true;
+        }
+        
         return false;
     },
 
