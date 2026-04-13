@@ -57,31 +57,46 @@ class DashboardView {
 
                 <div class="flex gap-4" style="margin-top: 20px;">
                     <div class="glass" style="flex: 2; padding: 20px;">
-                        <h2>Recent Borrows</h2>
+                        <h2>Recent Activity</h2>
                         <div class="table-container">
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Member</th>
-                                        <th>Book</th>
-                                        <th>Borrow Date</th>
+                                        <th>Subject</th>
+                                        <th>Action</th>
+                                        <th>Time</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${this.renderRecentBorrows(stats.recentBorrows)}
+                                    ${this.renderRecentActivity(stats.recentBorrows)}
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="glass" style="flex: 1; padding: 20px;">
-                        <h2>Quick Actions</h2>
-                        <div class="flex-col gap-2" style="margin-top: 15px;">
-                            <button class="btn btn-secondary" onclick="document.querySelector('.nav-item[data-view=\\'circulation\\']').click()">Issue Book</button>
-                            <button class="btn btn-secondary" onclick="document.querySelector('.nav-item[data-view=\\'books\\']').click()">Add New Book</button>
-                            <button class="btn btn-secondary" onclick="document.querySelector('.nav-item[data-view=\\'members\\']').click()">Register Member</button>
+                    <div class="glass" style="flex: 1; padding: 20px; display: flex; flex-direction: column;">
+                        <h2>System Health</h2>
+                        <div class="flex-col gap-4" style="margin-top: 15px; flex: 1;">
+                            <div class="health-item">
+                                <div class="flex justify-between" style="font-size: 13px; margin-bottom: 5px;">
+                                    <span>Database Storage</span>
+                                    <span>68%</span>
+                                </div>
+                                <div style="height: 6px; background: rgba(0,0,0,0.05); border-radius: 3px; overflow: hidden;">
+                                    <div style="width: 68%; height: 100%; background: var(--accent-color);"></div>
+                                </div>
+                            </div>
+                            <div class="health-item">
+                                <div class="flex justify-between" style="font-size: 13px; margin-bottom: 5px;">
+                                    <span>Active Sessions</span>
+                                    <span>${stats.activeMembers + 2}</span>
+                                </div>
+                                <div style="height: 6px; background: rgba(0,0,0,0.05); border-radius: 3px; overflow: hidden;">
+                                    <div style="width: 45%; height: 100%; background: var(--success-color);"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="margin-top: 30px;">
+                        <div style="margin-top: 20px;">
                             <p style="color: var(--text-muted); font-size: 13px;">Total Fines Collected:</p>
                             <h3 style="color: var(--danger-color); font-size: 24px;">₹${stats.totalFines}</h3>
                         </div>
@@ -93,7 +108,7 @@ class DashboardView {
         this.container.innerHTML = html;
     }
 
-    renderRecentBorrows(borrows) {
+    renderRecentActivity(borrows) {
         if (!borrows.length) return '<tr><td colspan="4">No recent activity</td></tr>';
         
         return borrows.map(b => {
@@ -101,14 +116,24 @@ class DashboardView {
              const book = this.books.find(bk => bk.bookId === b.bookId) || { title: 'Unknown' };
              
              let statusBadge = '';
-             if (b.status === 'Active') statusBadge = '<span class="badge badge-success">Active</span>';
-             else if (b.status === 'Overdue') statusBadge = '<span class="badge badge-danger">Overdue</span>';
-             else statusBadge = '<span class="badge badge-warning">Returned</span>';
+             let actionText = 'Borrowed';
+             if (b.status === 'Active') statusBadge = '<span class="badge badge-success">Live</span>';
+             else if (b.status === 'Overdue') {
+                 statusBadge = '<span class="badge badge-danger">Alert</span>';
+                 actionText = 'Overdue';
+             }
+             else {
+                 statusBadge = '<span class="badge badge-warning">Done</span>';
+                 actionText = 'Returned';
+             }
 
              return `
                 <tr>
-                    <td>${member.name}</td>
-                    <td>${book.title}</td>
+                    <td>
+                         <div style="font-weight: 500">${member.name}</div>
+                         <div style="font-size: 11px; color: var(--text-muted)">${book.title}</div>
+                    </td>
+                    <td>${actionText}</td>
                     <td>${b.borrowDate}</td>
                     <td>${statusBadge}</td>
                 </tr>

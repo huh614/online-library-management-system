@@ -60,7 +60,12 @@ class MemberDashboardView {
 
         const html = `
             <div class="view-section">
-                <h1>My Profile</h1>
+                <div class="flex justify-between items-center">
+                    <h1>My Profile</h1>
+                    <button class="btn btn-secondary" onclick="window.memberDashboardView.showEditProfileModal()">
+                        <i class="ph ph-user-circle"></i> Edit Profile
+                    </button>
+                </div>
                 <div class="flex gap-4" style="margin-top: 20px;">
                     <!-- Left: Current Books & Wishlist -->
                     <div style="flex: 1;">
@@ -175,6 +180,40 @@ class MemberDashboardView {
         this.init();
     }
 
+    showEditProfileModal() {
+        const html = `
+            <div class="input-group">
+                <label>Full Name</label>
+                <input type="text" id="p-name" class="input-field" value="${this.user.name}" required>
+            </div>
+            <div class="input-group">
+                <label>Phone Number</label>
+                <input type="text" id="p-phone" class="input-field" value="${this.user.phone || ''}">
+            </div>
+            <div class="input-group">
+                <label>New Password (leave blank to keep current)</label>
+                <input type="password" id="p-pass" class="input-field" placeholder="••••••••">
+            </div>
+        `;
+
+        App.showModal('Edit Profile', html, async () => {
+             const updates = {
+                 name: document.getElementById('p-name').value,
+                 phone: document.getElementById('p-phone').value
+             };
+             const pass = document.getElementById('p-pass').value;
+             if (pass) updates.password = pass;
+
+             await DB.update('members', 'memberId', this.user.memberId, updates);
+             
+             // Update session
+             this.user = { ...this.user, ...updates };
+             localStorage.setItem('olms_session', JSON.stringify(this.user));
+             
+             this.init();
+        }, 'Update Profile');
+    }
+
     destroy() {
         delete window.memberDashboardView;
     }
@@ -229,12 +268,33 @@ class MemberBooksView {
             `;
         }).join('');
 
+        const genres = [...new Set(this.books.map(b => b.genre || 'General'))];
+        const genreBtns = ['All', ...genres].map(g => `
+            <button class="btn btn-secondary category-chip ${g === 'All' ? 'active-chip' : ''}" data-genre="${g}">${g}</button>
+        `).join('');
+
         this.container.innerHTML = `
             <div class="view-section">
-                <h1>Library Catalog</h1>
+                <div class="flex justify-between items-center" style="margin-bottom: 24px;">
+                    <h1>Library Catalog</h1>
+                    <div class="flex gap-2">
+                         <select id="sort-m-books" class="input-field" style="width: 150px; padding: 6px 10px;">
+                            <option value="newest">Newest First</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                            <option value="az">Title: A-Z</option>
+                         </select>
+                    </div>
+                </div>
                 
-                <div class="input-group" style="max-width: 400px; margin-bottom: 24px;">
-                    <input type="text" class="input-field" placeholder="Search by title, author, or genre..." id="search-m-books">
+                <div class="flex gap-4 items-center" style="margin-bottom: 20px;">
+                    <div class="input-group" style="max-width: 400px; margin-bottom: 0; flex: 1;">
+                        <input type="text" class="input-field" placeholder="Search by title, author..." id="search-m-books">
+                    </div>
+                </div>
+
+                <div class="category-scroll" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px;">
+                    ${genreBtns}
                 </div>
 
                 <style>
@@ -243,9 +303,11 @@ class MemberBooksView {
                         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
                         gap: 24px;
                     }
-                    .book-card:hover {
-                        transform: translateY(-5px);
-                    }
+                    .book-card:hover { transform: translateY(-5px); }
+                    .category-chip { border-radius: 20px; white-space: nowrap; padding: 6px 16px; font-size: 13px; }
+                    .active-chip { background: var(--accent-color) !important; color: white !important; }
+                    .category-scroll::-webkit-scrollbar { height: 4px; }
+                    .category-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
                 </style>
 
                 <div class="m-books-grid" id="m-books-grid">
@@ -254,8 +316,41 @@ class MemberBooksView {
             </div>
         `;
 
-        document.getElementById('search-m-books').addEventListener('input', (e) => this.filter(e.target.value));
+        // Event Listeners
+        document.getElementById('search-m-books').addEventListener('input', () => this.applyFilters());
+        document.getElementById('sort-m-books').addEventListener('change', () => {
+             this.sortBooks();
+             this.render();
+        });
+        this.container.querySelectorAll('.category-chip').forEach(btn => {
+            btn.onclick = () => {
+                this.container.querySelectorAll('.category-chip').forEach(b => b.classList.remove('active-chip'));
+                btn.classList.add('active-chip');
+                this.applyFilters();
+            };
+        });
         window.memberBooksView = this;
+    }
+
+    sortBooks() {
+        const val = document.getElementById('sort-m-books').value;
+        if (val === 'price-low') this.books.sort((a,b) => a.price - b.price);
+        else if (val === 'price-high') this.books.sort((a,b) => b.price - a.price);
+        else if (val === 'az') this.books.sort((a,b) => a.title.localeCompare(b.title));
+        else if (val === 'newest') this.books.sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
+    }
+
+    applyFilters() {
+        const term = document.getElementById('search-m-books').value.toLowerCase();
+        const genre = this.container.querySelector('.category-chip.active-chip').dataset.genre;
+        
+        const cards = document.getElementById('m-books-grid').querySelectorAll('.book-card');
+        cards.forEach((card, index) => {
+            const b = this.books[index];
+            const matchesText = b.title.toLowerCase().includes(term) || (b.authors && b.authors.some(a => a.authorName.toLowerCase().includes(term)));
+            const matchesGenre = genre === 'All' || b.genre === genre;
+            card.style.display = (matchesText && matchesGenre) ? 'flex' : 'none';
+        });
     }
 
     async borrowBook(bookId) {
@@ -300,22 +395,13 @@ class MemberBooksView {
     readExcerpt(bookId) {
         const book = this.books.find(b => b.bookId === bookId);
         const html = `
-            <div style="background: var(--surface-light); padding: 15px; border-radius: 8px; font-family: serif; line-height: 1.6;">
-                <p><em>(Digital Content Placeholder)</em></p>
+            <div style="background: var(--panel-bg); padding: 15px; border-radius: 8px; font-family: serif; line-height: 1.6; border: 1px solid var(--border);">
+                <h4 style="margin-bottom: 10px;">Chapter 1: The Beginning</h4>
                 <p>The sky above the port was the color of television, tuned to a dead channel. It was the best of times, it was the blurst of times...</p>
-                <p>This is a simulated digital reading view. In a full system, the complete EPUB or PDF reader would launch here for <strong>${book.title}</strong>.</p>
+                <p style="margin-top: 10px;">This is a premium digital reading preview for <strong>${book.title}</strong>. Full digital access is available for Premium members.</p>
             </div>
         `;
-        App.showModal(`Reading Excerpt: ${book.title}`, html, null, 'Close');
-    }
-
-    filter(term) {
-        term = term.toLowerCase();
-        const cards = document.getElementById('m-books-grid').querySelectorAll('.book-card');
-        cards.forEach(card => {
-            const text = card.innerText.toLowerCase();
-            card.style.display = text.includes(term) ? 'flex' : 'none';
-        });
+        App.showModal(`Digital Preview: ${book.title}`, html, null, 'Close');
     }
 
     destroy() {

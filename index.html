@@ -88,14 +88,21 @@
                     <span class="user-name" id="current-user-name">User Name</span>
                     <span class="user-role" id="current-user-role">Role</span>
                 </div>
-                <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%;" id="logout-btn" title="Logout">
-                    <i class="ph ph-sign-out"></i>
-                </button>
+                <div class="flex gap-2">
+                    <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%; position: relative;" id="notif-btn" title="Notifications">
+                        <i class="ph ph-bell"></i>
+                        <span id="notif-badge" style="display: none; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: var(--danger-color); border-radius: 50%; border: 2px solid var(--panel);"></span>
+                    </button>
+                    <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%;" id="logout-btn" title="Logout">
+                        <i class="ph ph-sign-out"></i>
+                    </button>
+                </div>
             </div>
-            <div style="margin-top: 10px; align-self: flex-start;">
+            <div style="margin-top: 10px; padding: 0 12px; display: flex; justify-content: space-between; align-items: center;">
                  <button class="btn btn-secondary" style="padding: 6px; border-radius: 50%;" id="theme-toggle" title="Toggle Theme">
                     <i class="ph ph-moon"></i>
                 </button>
+                <span style="font-size: 10px; color: var(--text-muted); font-weight: 500;">v2.1.0-PRO</span>
             </div>
         </aside>
 

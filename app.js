@@ -6,14 +6,13 @@ const App = {
     currentView: null,
 
     async init() {
-        // Init Auth first to see if logged in
         Auth.init();
-        
-        await DB.seed(); // Wait for server to seed if it hasn't
+        await DB.seed(); 
 
         this.cacheDOM();
         this.bindEvents();
         this.initTheme();
+        this.initNotifications();
 
         if (Auth.getUser()) {
             this.showApp();
@@ -159,6 +158,50 @@ const App = {
             const isDark = document.documentElement.classList.contains('dark-theme');
             document.getElementById('theme-toggle').innerHTML = isDark ? '<i class="ph ph-sun"></i>' : '<i class="ph ph-moon"></i>';
         });
+
+        // Notifications
+        document.getElementById('notif-btn').addEventListener('click', () => this.showNotifications());
+    },
+
+    async initNotifications() {
+        const user = Auth.getUser();
+        if (!user) return;
+
+        const badge = document.getElementById('notif-badge');
+        let count = 0;
+
+        if (Auth.isAdmin()) {
+            const borrows = await DB.getAll('borrows');
+            count = borrows.filter(b => b.status === 'Overdue').length;
+        } else {
+            const borrows = await DB.getActiveBorrowsForMember(user.memberId);
+            count = borrows.filter(b => b.status === 'Overdue').length;
+        }
+
+        badge.style.display = count > 0 ? 'block' : 'none';
+    },
+
+    async showNotifications() {
+        const user = Auth.getUser();
+        let html = '';
+        let alerts = [];
+
+        if (Auth.isAdmin()) {
+            const borrows = await DB.getAll('borrows');
+            alerts = borrows.filter(b => b.status === 'Overdue').map(b => `Overdue alert for Book ${b.bookId} (Member: ${b.memberId})`);
+        } else {
+            const borrows = await DB.getActiveBorrowsForMember(user.memberId);
+            alerts = borrows.filter(b => b.status === 'Overdue').map(b => `Urgent: Book "${b.bookId}" is overdue. Please return to avoid further fines.`);
+        }
+
+        if (alerts.length === 0) {
+            html = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">You have no new notifications.</p>';
+        } else {
+            html = `<div class="flex-col gap-3">${alerts.map(a => `<div class="glass" style="padding:12px; font-size:13px; border-left: 4px solid var(--danger-color);">${a}</div>`).join('')}</div>`;
+        }
+
+        this.showModal('Notifications', html, null, 'Close');
+        document.getElementById('notif-badge').style.display = 'none';
     },
 
     initTheme() {
